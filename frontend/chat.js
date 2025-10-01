@@ -53,8 +53,8 @@ async function sendMessage() {
         body: JSON.stringify({
           spaceId: SPACE_ID,
           title,
-          boardId: 1,     // ← замени на реальный boardId из твоей доски
-          columnId: 1     // ← первая колонка
+          boardId: 1448561,     // ← замени на реальный boardId из твоей доски
+          columnId: 5030786     // ← первая колонка
         })
       });
 
