@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kaiten Chat</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 10px; }
+    #messages { border: 1px solid #ddd; height: 400px; overflow-y: auto; padding: 10px; margin-bottom: 10px; }
+    .msg { margin: 6px 0; padding: 6px; background: #f9f9f9; border-radius: 4px; }
+    .cmd { background: #e3f2fd; }
+    input { width: 70%; padding: 8px; }
+    button { padding: 8px 16px; margin-left: 8px; }
+  </style>
+</head>
+<body>
+  <h2>🗨️ Чат для пространства: <span id="space-id">?</span></h2>
+  <div id="messages"></div>
+  <input type="text" id="msg-input" placeholder="/task Сделать дизайн">
+  <button onclick="sendMessage()">Отправить</button>
+
+  <script src="chat.js"></script>
+</body>
+</html>
