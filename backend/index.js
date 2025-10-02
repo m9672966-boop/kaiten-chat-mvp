@@ -8,24 +8,33 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Хранилище сообщений
+// === Конфигурация досок и колонок ===
+const BOARD_CONFIG = {
+  // Формат: 'spaceId': { board_id, column_id }
+  '231326': { board_id: 664999,  column_id: 111111 }, // ← замени на реальные column_id
+  '572075': { board_id: 1358802, column_id: 222222 },
+  '229225': { board_id: 541086,  column_id: 333333 }
+};
+
+// === Kaiten API ===
+const KAITEN_API_TOKEN = process.env.KAITEN_API_TOKEN;
+const KAITEN_DOMAIN = process.env.KAITEN_DOMAIN || 'panna.kaiten.ru';
+
+// === Хранилище сообщений (в памяти) ===
 let messages = [];
 
-// Настройки Kaiten
-const KAITEN_API_TOKEN = process.env.KAITEN_API_TOKEN;
-const KAITEN_DOMAIN = process.env.KAITEN_DOMAIN; // например: panna.kaiten.ru
-
-// === API: создание карточки (task) в Kaiten ===
+// === Создание карточки ===
 app.post('/api/proxy/card', async (req, res) => {
-  const { spaceId, title, boardId, columnId } = req.body;
+  const { spaceId, title } = req.body;
 
-  if (!KAITEN_API_TOKEN || !KAITEN_DOMAIN) {
-    return res.status(500).json({ error: 'KAITEN_API_TOKEN или KAITEN_DOMAIN не заданы' });
+  if (!KAITEN_API_TOKEN) {
+    return res.status(500).json({ error: 'KAITEN_API_TOKEN не задан' });
   }
 
-  // По умолчанию — берем boardId и columnId из URL или используем дефолтные
-  const board_id = boardId || 1; // ← замени на реальный boardId из твоей доски
-  const column_id = columnId || 1; // ← первая колонка
+  const config = BOARD_CONFIG[spaceId];
+  if (!config) {
+    return res.status(400).json({ error: `Не настроена доска для spaceId=${spaceId}` });
+  }
 
   try {
     const kaitenRes = await fetch(`https://${KAITEN_DOMAIN}/api/latest/cards`, {
@@ -36,8 +45,8 @@ app.post('/api/proxy/card', async (req, res) => {
       },
       body: JSON.stringify({
         title,
-        board_id,
-        column_id,
+        board_id: config.board_id,
+        column_id: config.column_id,
         asap: false,
         due_date: null
       })
@@ -47,44 +56,57 @@ app.post('/api/proxy/card', async (req, res) => {
     res.status(kaitenRes.status).json(data);
   } catch (err) {
     console.error('Kaiten API error:', err);
-    res.status(500).json({ error: 'Ошибка при обращении к Kaiten API' });
+    res.status(500).json({ error: 'Ошибка Kaiten API' });
   }
 });
 
-// === Чат API ===
+// === Отправка сообщения (общее или приватное) ===
 app.post('/api/messages', (req, res) => {
-  const { spaceId, text, author } = req.body;
-  if (!spaceId || !text) {
-    return res.status(400).json({ error: 'spaceId и text обязательны' });
+  const { spaceId, roomId, text, author } = req.body;
+
+  if (!text || !author) {
+    return res.status(400).json({ error: 'text и author обязательны' });
+  }
+  if (!spaceId && !roomId) {
+    return res.status(400).json({ error: 'Нужен spaceId или roomId' });
   }
 
   const msg = {
     id: uuidv4(),
-    spaceId,
+    spaceId: spaceId || null,
+    roomId: roomId || null,
+    author,
     text,
-    author: author || 'Аноним',
     isCommand: text.startsWith('/'),
     createdAt: new Date().toISOString()
   };
+
   messages.push(msg);
   res.json(msg);
 });
 
-app.get('/api/messages/:spaceId', (req, res) => {
+// === Получить общий чат ===
+app.get('/api/messages/space/:spaceId', (req, res) => {
   const { spaceId } = req.params;
   const spaceMessages = messages.filter(m => m.spaceId === spaceId);
   res.json(spaceMessages);
 });
 
-// Раздаём фронтенд
+// === Получить приватный чат ===
+app.get('/api/messages/room/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  const roomMessages = messages.filter(m => m.roomId === roomId);
+  res.json(roomMessages);
+});
+
+// === Раздача фронтенда ===
 app.use(express.static('../frontend'));
 
-// Главная страница
 app.get('/', (req, res) => {
   res.sendFile(__dirname + '/../frontend/index.html');
 });
 
 app.listen(PORT, () => {
   console.log(`✅ Сервер запущен на порту ${PORT}`);
-  console.log(`🌐 Kaiten Domain: ${KAITEN_DOMAIN || 'не задан'}`);
+  console.log(`🌐 Kaiten Domain: ${KAITEN_DOMAIN}`);
 });
