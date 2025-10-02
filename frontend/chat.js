@@ -1,16 +1,16 @@
-// Получаем spaceId и invite из URL
+// === URL параметры ===
 const urlParams = new URLSearchParams(window.location.search);
 const SPACE_ID = urlParams.get('space') || '572075';
 const inviteName = urlParams.get('invite');
 
-// Авторизация по имени
+// === Авторизация по имени ===
 let userName = localStorage.getItem('kaiten_chat_user_name');
 if (inviteName) {
   userName = decodeURIComponent(inviteName);
   localStorage.setItem('kaiten_chat_user_name', userName);
 }
 if (!userName) {
-  userName = prompt('Введите ваше имя и фамилию (например, Елизавета Манцурова):');
+  userName = prompt('Введите ваше имя и фамилию:');
   if (userName) {
     localStorage.setItem('kaiten_chat_user_name', userName);
   } else {
@@ -19,18 +19,49 @@ if (!userName) {
   }
 }
 
-document.getElementById('space-id').textContent = SPACE_ID;
-
-// API_BASE — текущий origin (для Render)
+// === Глобальные переменные ===
 const API_BASE = window.location.origin;
+let currentMode = 'space'; // 'space' или 'private'
+let currentRoomId = null;
 
-// Загрузка сообщений
+// === UI переключение ===
+document.querySelectorAll('input[name="mode"]').forEach(radio => {
+  radio.addEventListener('change', (e) => {
+    currentMode = e.target.value;
+    document.getElementById('private-user').style.display = currentMode === 'private' ? 'inline-block' : 'none';
+    loadMessages();
+  });
+});
+
+// === Генерация roomId для приватного чата ===
+function getRoomId(otherName) {
+  return [userName, otherName].sort().join('_');
+}
+
+// === Загрузка сообщений ===
 async function loadMessages() {
+  const privateUser = document.getElementById('private-user').value.trim();
+  const container = document.getElementById('messages');
+  container.innerHTML = '<div>Загрузка...</div>';
+
   try {
-    const res = await fetch(`${API_BASE}/api/messages/${SPACE_ID}`);
-    if (!res.ok) throw new Error('Не удалось загрузить сообщения');
-    const msgs = await res.json();
-    const container = document.getElementById('messages');
+    let msgs = [];
+    let title = '';
+
+    if (currentMode === 'private' && privateUser) {
+      const roomId = getRoomId(privateUser);
+      currentRoomId = roomId;
+      const res = await fetch(`${API_BASE}/api/messages/room/${roomId}`);
+      msgs = await res.json();
+      title = `Приватный чат с ${privateUser}`;
+    } else {
+      const res = await fetch(`${API_BASE}/api/messages/space/${SPACE_ID}`);
+      msgs = await res.json();
+      title = `Общий чат (пространство ${SPACE_ID})`;
+      currentRoomId = null;
+    }
+
+    document.getElementById('chat-title').textContent = title;
     container.innerHTML = '';
     msgs.forEach(m => {
       const el = document.createElement('div');
@@ -41,21 +72,30 @@ async function loadMessages() {
     container.scrollTop = container.scrollHeight;
   } catch (err) {
     console.error(err);
+    container.innerHTML = '<div style="color:red;">Ошибка загрузки</div>';
   }
 }
 
-// Отправка сообщения
+// === Отправка сообщения ===
 async function sendMessage() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text) return;
 
+  const privateUser = document.getElementById('private-user').value.trim();
+  let payload = { text, author: userName };
+
+  if (currentMode === 'private' && privateUser) {
+    payload.roomId = getRoomId(privateUser);
+  } else {
+    payload.spaceId = SPACE_ID;
+  }
+
   try {
-    // Сохраняем в чат
     await fetch(`${API_BASE}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spaceId: SPACE_ID, text, author: userName })
+      body: JSON.stringify(payload)
     });
 
     // Обработка команд
@@ -64,17 +104,10 @@ async function sendMessage() {
       const cardRes = await fetch(`${API_BASE}/api/proxy/card`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          spaceId: SPACE_ID,
-          title,
-          boardId: 1,     // ← замени на реальный boardId
-          columnId: 1     // ← первая колонка
-        })
+        body: JSON.stringify({ spaceId: SPACE_ID, title })
       });
 
-      if (cardRes.ok) {
-        alert('✅ Карточка создана в Kaiten!');
-      } else {
+      if (!cardRes.ok) {
         const err = await cardRes.json();
         alert('❌ Ошибка: ' + (err.detail || JSON.stringify(err)).substring(0, 100));
       }
@@ -88,7 +121,7 @@ async function sendMessage() {
   }
 }
 
-// Приглашение
+// === Приглашение ===
 function inviteUser() {
   const name = prompt('Имя и фамилия приглашённого:');
   if (name) {
@@ -97,11 +130,11 @@ function inviteUser() {
   }
 }
 
-// Enter → отправка
+// === Enter → отправка ===
 document.getElementById('msg-input').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
 });
 
-// Загружаем при старте
+// === Автообновление ===
 loadMessages();
-setInterval(loadMessages, 5000); // автообновление
+setInterval(loadMessages, 5000);
