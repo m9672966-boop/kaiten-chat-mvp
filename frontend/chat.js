@@ -1,9 +1,7 @@
-// === URL параметры ===
 const urlParams = new URLSearchParams(window.location.search);
 const SPACE_ID = urlParams.get('space') || '572075';
 const inviteName = urlParams.get('invite');
 
-// === Авторизация по имени ===
 let userName = localStorage.getItem('kaiten_chat_user_name');
 if (inviteName) {
   userName = decodeURIComponent(inviteName);
@@ -19,10 +17,8 @@ if (!userName) {
   }
 }
 
-// === Глобальные переменные ===
 const API_BASE = window.location.origin;
-let currentMode = 'space'; // 'space' или 'private'
-let currentRoomId = null;
+let currentMode = 'space';
 
 // === UI переключение ===
 document.querySelectorAll('input[name="mode"]').forEach(radio => {
@@ -33,9 +29,135 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => {
   });
 });
 
-// === Генерация roomId для приватного чата ===
+// === Emoji ===
+document.getElementById('toggle-emoji').addEventListener('click', () => {
+  const picker = document.getElementById('emoji-picker');
+  picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
+});
+
+document.querySelectorAll('.emoji').forEach(el => {
+  el.addEventListener('click', () => {
+    document.getElementById('msg-input').value += el.textContent;
+    document.getElementById('msg-input').focus();
+    document.getElementById('emoji-picker').style.display = 'none';
+  });
+});
+
+// === Загрузка изображений ===
+const dropArea = document.getElementById('drop-area');
+const fileInput = document.getElementById('file-input');
+
+document.getElementById('toggle-upload').addEventListener('click', () => {
+  dropArea.style.display = dropArea.style.display === 'none' ? 'block' : 'none';
+});
+
+dropArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', uploadImage);
+
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, preventDefaults, false);
+});
+
+function preventDefaults(e) {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+['dragenter', 'dragover'].forEach(eventName => {
+  dropArea.addEventListener(eventName, highlight, false);
+});
+
+['dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, unhighlight, false);
+});
+
+function highlight() {
+  dropArea.classList.add('dragover');
+}
+
+function unhighlight() {
+  dropArea.classList.remove('dragover');
+}
+
+dropArea.addEventListener('drop', handleDrop, false);
+
+function handleDrop(e) {
+  const dt = e.dataTransfer;
+  const files = dt.files;
+  if (files.length) {
+    fileInput.files = files;
+    uploadImage();
+  }
+}
+
+async function uploadImage() {
+  const file = fileInput.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append('image', file);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/upload`, {
+      method: 'POST',
+      body: formData
+    });
+    const data = await res.json();
+    if (data.url) {
+      // Отправляем сообщение с изображением
+      const privateUser = document.getElementById('private-user').value.trim();
+      let payload = { author: userName, imageUrl: data.url };
+
+      if (currentMode === 'private' && privateUser) {
+        payload.roomId = getRoomId(privateUser);
+      } else {
+        payload.spaceId = SPACE_ID;
+      }
+
+      await fetch(`${API_BASE}/api/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      loadMessages();
+      fileInput.value = '';
+      dropArea.style.display = 'none';
+    }
+  } catch (err) {
+    console.error('Ошибка загрузки:', err);
+    alert('Не удалось загрузить изображение');
+  }
+}
+
+// === Вспомогательные функции ===
 function getRoomId(otherName) {
   return [userName, otherName].sort().join('_');
+}
+
+// === Безопасное отображение сообщений (XSS protection) ===
+function createMessageElement(msg) {
+  const el = document.createElement('div');
+  el.className = 'msg' + (msg.isCommand ? ' cmd' : '');
+
+  const authorEl = document.createElement('strong');
+  authorEl.textContent = msg.author + ': ';
+  el.appendChild(authorEl);
+
+  if (msg.text) {
+    const textEl = document.createElement('span');
+    textEl.textContent = msg.text;
+    el.appendChild(textEl);
+  }
+
+  if (msg.imageUrl) {
+    const img = document.createElement('img');
+    img.src = msg.imageUrl;
+    img.alt = 'Изображение';
+    el.appendChild(img);
+  }
+
+  return el;
 }
 
 // === Загрузка сообщений ===
@@ -50,7 +172,6 @@ async function loadMessages() {
 
     if (currentMode === 'private' && privateUser) {
       const roomId = getRoomId(privateUser);
-      currentRoomId = roomId;
       const res = await fetch(`${API_BASE}/api/messages/room/${roomId}`);
       msgs = await res.json();
       title = `Приватный чат с ${privateUser}`;
@@ -58,16 +179,12 @@ async function loadMessages() {
       const res = await fetch(`${API_BASE}/api/messages/space/${SPACE_ID}`);
       msgs = await res.json();
       title = `Общий чат (пространство ${SPACE_ID})`;
-      currentRoomId = null;
     }
 
     document.getElementById('chat-title').textContent = title;
     container.innerHTML = '';
     msgs.forEach(m => {
-      const el = document.createElement('div');
-      el.className = 'msg' + (m.isCommand ? ' cmd' : '');
-      el.innerHTML = `<strong>${m.author}:</strong> ${m.text}`;
-      container.appendChild(el);
+      container.appendChild(createMessageElement(m));
     });
     container.scrollTop = container.scrollHeight;
   } catch (err) {
@@ -76,7 +193,7 @@ async function loadMessages() {
   }
 }
 
-// === Отправка сообщения ===
+// === Отправка текстового сообщения ===
 async function sendMessage() {
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
@@ -98,7 +215,6 @@ async function sendMessage() {
       body: JSON.stringify(payload)
     });
 
-    // Обработка команд
     if (text.startsWith('/task ')) {
       const title = text.substring(6);
       const cardRes = await fetch(`${API_BASE}/api/proxy/card`, {
@@ -106,7 +222,6 @@ async function sendMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spaceId: SPACE_ID, title })
       });
-
       if (!cardRes.ok) {
         const err = await cardRes.json();
         alert('❌ Ошибка: ' + (err.detail || JSON.stringify(err)).substring(0, 100));
