@@ -1,10 +1,24 @@
-// Получаем spaceId из URL
+// Получаем spaceId и invite из URL
 const urlParams = new URLSearchParams(window.location.search);
-const SPACE_ID = urlParams.get('space');
-if (!SPACE_ID) {
-  alert('Укажите ?space=ID в URL, например: ?space=566023');
-  throw new Error('No space ID');
+const SPACE_ID = urlParams.get('space') || '572075';
+const inviteName = urlParams.get('invite');
+
+// Авторизация по имени
+let userName = localStorage.getItem('kaiten_chat_user_name');
+if (inviteName) {
+  userName = decodeURIComponent(inviteName);
+  localStorage.setItem('kaiten_chat_user_name', userName);
 }
+if (!userName) {
+  userName = prompt('Введите ваше имя и фамилию (например, Елизавета Манцурова):');
+  if (userName) {
+    localStorage.setItem('kaiten_chat_user_name', userName);
+  } else {
+    alert('Требуется имя');
+    throw new Error('No name');
+  }
+}
+
 document.getElementById('space-id').textContent = SPACE_ID;
 
 // API_BASE — текущий origin (для Render)
@@ -21,7 +35,7 @@ async function loadMessages() {
     msgs.forEach(m => {
       const el = document.createElement('div');
       el.className = 'msg' + (m.isCommand ? ' cmd' : '');
-      el.textContent = m.text;
+      el.innerHTML = `<strong>${m.author}:</strong> ${m.text}`;
       container.appendChild(el);
     });
     container.scrollTop = container.scrollHeight;
@@ -41,7 +55,7 @@ async function sendMessage() {
     await fetch(`${API_BASE}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ spaceId: SPACE_ID, text })
+      body: JSON.stringify({ spaceId: SPACE_ID, text, author: userName })
     });
 
     // Обработка команд
@@ -53,8 +67,8 @@ async function sendMessage() {
         body: JSON.stringify({
           spaceId: SPACE_ID,
           title,
-          boardId: 1448561,     // ← замени на реальный boardId из твоей доски
-          columnId: 5030786     // ← первая колонка
+          boardId: 1,     // ← замени на реальный boardId
+          columnId: 1     // ← первая колонка
         })
       });
 
@@ -71,6 +85,15 @@ async function sendMessage() {
   } catch (err) {
     console.error(err);
     alert('Ошибка отправки');
+  }
+}
+
+// Приглашение
+function inviteUser() {
+  const name = prompt('Имя и фамилия приглашённого:');
+  if (name) {
+    const inviteLink = `${window.location.origin}?space=${SPACE_ID}&invite=${encodeURIComponent(name)}`;
+    prompt('Отправьте эту ссылку:', inviteLink);
   }
 }
 
