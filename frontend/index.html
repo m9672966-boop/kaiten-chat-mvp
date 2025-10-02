@@ -6,7 +6,8 @@
   <title>Kaiten Chat</title>
   <style>
     body { font-family: sans-serif; max-width: 800px; margin: 20px auto; padding: 0 10px; }
-    h2 { color: #2c3e50; }
+    h2 { color: #2c3e50; font-size: 18px; margin-bottom: 10px; }
+    #chat-header { margin-bottom: 10px; }
     #messages { 
       border: 1px solid #ddd; 
       height: 300px; 
@@ -14,23 +15,23 @@
       padding: 10px; 
       margin-bottom: 10px; 
       background: #fafafa; 
+      font-size: 13px;
     }
     .msg { 
       padding: 6px; 
       margin: 4px 0; 
       background: white; 
       border-radius: 4px; 
-      font-size: 13px; 
     }
     .cmd { background: #e3f2fd; }
-    .input-area { display: flex; gap: 8px; }
-    input { 
-      flex: 1; 
+    .input-area { display: flex; gap: 8px; margin-top: 10px; }
+    input, select { 
       padding: 8px; 
       border: 1px solid #ccc; 
       border-radius: 4px; 
       font-size: 13px; 
     }
+    input { flex: 1; }
     button { 
       padding: 8px 12px; 
       background: #3498db; 
@@ -41,13 +42,25 @@
       font-size: 13px; 
     }
     button:hover { background: #2980b9; }
+    #private-input { display: none; }
   </style>
 </head>
 <body>
-  <h2>🗨️ Чат для пространства: <span id="space-id">?</span></h2>
+  <div id="chat-header">
+    <h2>🗨️ <span id="chat-title">Чат</span></h2>
+    <div>
+      <label>
+        <input type="radio" name="mode" value="space" checked> Общий чат
+      </label>
+      <label>
+        <input type="radio" name="mode" value="private"> Приватный чат
+      </label>
+      <input type="text" id="private-user" placeholder="Имя собеседника" style="display:none; margin-left: 10px;">
+    </div>
+  </div>
   <div id="messages"></div>
   <div class="input-area">
-    <input type="text" id="msg-input" placeholder="/task Сделать дизайн">
+    <input type="text" id="msg-input" placeholder="/task Сделать задачу или просто написать">
     <button onclick="sendMessage()">Отправить</button>
     <button onclick="inviteUser()" style="background: #95a5a6;">Пригласить</button>
   </div>
