@@ -38,7 +38,7 @@ app.post('/api/proxy/card', async (req, res) => {
         title,
         board_id,
         column_id,
-        asap: false, // можно сделать опциональным
+        asap: false,
         due_date: null
       })
     });
@@ -53,7 +53,7 @@ app.post('/api/proxy/card', async (req, res) => {
 
 // === Чат API ===
 app.post('/api/messages', (req, res) => {
-  const { spaceId, text } = req.body;
+  const { spaceId, text, author } = req.body;
   if (!spaceId || !text) {
     return res.status(400).json({ error: 'spaceId и text обязательны' });
   }
@@ -62,6 +62,7 @@ app.post('/api/messages', (req, res) => {
     id: uuidv4(),
     spaceId,
     text,
+    author: author || 'Аноним',
     isCommand: text.startsWith('/'),
     createdAt: new Date().toISOString()
   };
