@@ -1,39 +1,44 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Папка для загрузки изображений
+const UPLOADS_DIR = 'uploads';
+const upload = multer({ dest: UPLOADS_DIR });
+
 app.use(cors());
 app.use(express.json());
+app.use('/uploads', express.static(UPLOADS_DIR)); // раздаём изображения
 
-// === Конфигурация досок и колонок ===
+// === Конфигурация досок ===
 const BOARD_CONFIG = {
-  // Формат: 'spaceId': { board_id, column_id }
-  '231326': { board_id: 664999,  column_id: 664999 }, // ← замени на реальные column_id
-  '572075': { board_id: 1358802, column_id: 1358802 },
-  '229225': { board_id: 541086,  column_id: 541086 }
+  '231326': { board_id: 664999,  column_id: 2394368 },
+  '572075': { board_id: 1358802, column_id: 4718618 },
+  '229225': { board_id: 541086,  column_id: 1935037 }
 };
 
 // === Kaiten API ===
 const KAITEN_API_TOKEN = process.env.KAITEN_API_TOKEN;
 const KAITEN_DOMAIN = process.env.KAITEN_DOMAIN || 'panna.kaiten.ru';
 
-// === Хранилище сообщений (в памяти) ===
+// === Хранилище сообщений ===
 let messages = [];
 
 // === Создание карточки ===
 app.post('/api/proxy/card', async (req, res) => {
   const { spaceId, title } = req.body;
-
-  if (!KAITEN_API_TOKEN) {
-    return res.status(500).json({ error: 'KAITEN_API_TOKEN не задан' });
-  }
-
   const config = BOARD_CONFIG[spaceId];
   if (!config) {
     return res.status(400).json({ error: `Не настроена доска для spaceId=${spaceId}` });
+  }
+
+  if (!KAITEN_API_TOKEN) {
+    return res.status(500).json({ error: 'KAITEN_API_TOKEN не задан' });
   }
 
   try {
@@ -60,24 +65,32 @@ app.post('/api/proxy/card', async (req, res) => {
   }
 });
 
-// === Отправка сообщения (общее или приватное) ===
-app.post('/api/messages', (req, res) => {
-  const { spaceId, roomId, text, author } = req.body;
+// === Загрузка изображения ===
+app.post('/api/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: 'Файл не загружен' });
+  }
 
-  if (!text || !author) {
-    return res.status(400).json({ error: 'text и author обязательны' });
-  }
-  if (!spaceId && !roomId) {
-    return res.status(400).json({ error: 'Нужен spaceId или roomId' });
-  }
+  // Генерируем URL
+  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
+  res.json({ url: imageUrl });
+});
+
+// === Отправка сообщения ===
+app.post('/api/messages', (req, res) => {
+  const { spaceId, roomId, text, author, imageUrl } = req.body;
+
+  if (!author) return res.status(400).json({ error: 'author обязателен' });
+  if (!spaceId && !roomId) return res.status(400).json({ error: 'Нужен spaceId или roomId' });
 
   const msg = {
     id: uuidv4(),
     spaceId: spaceId || null,
     roomId: roomId || null,
     author,
-    text,
-    isCommand: text.startsWith('/'),
+    text: text || '',
+    imageUrl: imageUrl || null,
+    isCommand: text?.startsWith('/'),
     createdAt: new Date().toISOString()
   };
 
@@ -85,21 +98,18 @@ app.post('/api/messages', (req, res) => {
   res.json(msg);
 });
 
-// === Получить общий чат ===
+// === Получение сообщений ===
 app.get('/api/messages/space/:spaceId', (req, res) => {
   const { spaceId } = req.params;
-  const spaceMessages = messages.filter(m => m.spaceId === spaceId);
-  res.json(spaceMessages);
+  res.json(messages.filter(m => m.spaceId === spaceId));
 });
 
-// === Получить приватный чат ===
 app.get('/api/messages/room/:roomId', (req, res) => {
   const { roomId } = req.params;
-  const roomMessages = messages.filter(m => m.roomId === roomId);
-  res.json(roomMessages);
+  res.json(messages.filter(m => m.roomId === roomId));
 });
 
-// === Раздача фронтенда ===
+// === Фронтенд ===
 app.use(express.static('../frontend'));
 
 app.get('/', (req, res) => {
