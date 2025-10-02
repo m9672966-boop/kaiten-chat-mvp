@@ -11,9 +11,9 @@ app.use(express.json());
 // === Конфигурация досок и колонок ===
 const BOARD_CONFIG = {
   // Формат: 'spaceId': { board_id, column_id }
-  '231326': { board_id: 664999,  column_id: 111111 }, // ← замени на реальные column_id
-  '572075': { board_id: 1358802, column_id: 222222 },
-  '229225': { board_id: 541086,  column_id: 333333 }
+  '231326': { board_id: 664999,  column_id: 664999 }, // ← замени на реальные column_id
+  '572075': { board_id: 1358802, column_id: 1358802 },
+  '229225': { board_id: 541086,  column_id: 541086 }
 };
 
 // === Kaiten API ===
