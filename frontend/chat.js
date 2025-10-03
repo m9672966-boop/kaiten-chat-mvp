@@ -3,7 +3,7 @@ let SPACE_ID = urlParams.get('space') || '572075';
 let userName = localStorage.getItem('kaiten_chat_user_name');
 let currentMode = 'space';
 
-// === Ввод имени через поле ===
+// === Ввод имени ===
 if (!userName) {
   const container = document.getElementById('messages').parentNode;
   const nameInput = document.createElement('div');
@@ -49,7 +49,7 @@ function getColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-// === Emoji — делегирование событий ===
+// === Emoji — делегирование ===
 document.addEventListener('click', (e) => {
   if (e.target.classList.contains('emoji')) {
     document.getElementById('msg-input').value += e.target.textContent;
@@ -58,72 +58,58 @@ document.addEventListener('click', (e) => {
   }
 });
 
-// === Кнопки эмодзи и загрузки ===
-document.getElementById('toggle-emoji')?.addEventListener('click', () => {
-  const picker = document.getElementById('emoji-picker');
-  if (picker) {
-    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-  }
-});
-
+// === Загрузка изображений (в Base64) ===
 const dropArea = document.getElementById('drop-area');
 const fileInput = document.getElementById('file-input');
 
-document.getElementById('toggle-upload')?.addEventListener('click', () => {
-  if (dropArea) {
-    dropArea.style.display = dropArea.style.display === 'none' ? 'block' : 'none';
-  }
+document.getElementById('toggle-upload').addEventListener('click', () => {
+  dropArea.style.display = dropArea.style.display === 'none' ? 'block' : 'none';
 });
 
-if (dropArea && fileInput) {
-  dropArea.addEventListener('click', () => fileInput.click());
-  fileInput.addEventListener('change', uploadImage);
+dropArea.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', uploadImage);
 
-  ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
-  });
+['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
+});
 
-  ['dragenter', 'dragover'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#3498db', false);
-  });
+['dragenter', 'dragover'].forEach(eventName => {
+  dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#3498db', false);
+});
 
-  ['dragleave', 'drop'].forEach(eventName => {
-    dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#ccc', false);
-  });
+['dragleave', 'drop'].forEach(eventName => {
+  dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#ccc', false);
+});
 
-  dropArea.addEventListener('drop', handleDrop, false);
-}
+dropArea.addEventListener('drop', handleDrop, false);
 
 function handleDrop(e) {
   e.preventDefault();
   const files = e.dataTransfer.files;
-  if (files.length && fileInput) {
+  if (files.length) {
     fileInput.files = files;
     uploadImage();
   }
 }
 
 async function uploadImage() {
-  if (!fileInput || !fileInput.files[0]) return;
   const file = fileInput.files[0];
-  const formData = new FormData();
-  formData.append('image', file);
+  if (!file) return;
 
-  try {
-    const res = await fetch(`${window.location.origin}/api/upload`, {
-      method: 'POST',
-      body: formData
-    });
-    const data = await res.json();
-    if (data.url) {
-      const privateUser = document.getElementById('private-user')?.value.trim() || '';
-      let payload = { author: userName, imageUrl: data.url };
-      if (currentMode === 'private' && privateUser) {
-        payload.roomId = getRoomId(privateUser);
-      } else {
-        payload.spaceId = SPACE_ID;
-      }
+  const reader = new FileReader();
+  reader.onload = async (event) => {
+    const base64 = event.target.result;
+    // Отправляем Base64
+    const privateUser = document.getElementById('private-user').value.trim();
+    let payload = { author: userName, imageUrl: base64 };
 
+    if (currentMode === 'private' && privateUser) {
+      payload.roomId = getRoomId(privateUser);
+    } else {
+      payload.spaceId = SPACE_ID;
+    }
+
+    try {
       await fetch(`${window.location.origin}/api/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -132,42 +118,36 @@ async function uploadImage() {
 
       loadMessages();
       fileInput.value = '';
-      if (dropArea) dropArea.style.display = 'none';
+      dropArea.style.display = 'none';
+    } catch (err) {
+      console.error('Ошибка загрузки:', err);
+      alert('Не удалось загрузить изображение');
     }
-  } catch (err) {
-    console.error('Ошибка загрузки:', err);
-    alert('Не удалось загрузить изображение');
-  }
+  };
+  reader.readAsDataURL(file);
 }
 
 // === Вставка через Ctrl+V ===
-document.getElementById('msg-input')?.addEventListener('paste', async (e) => {
+document.getElementById('msg-input').addEventListener('paste', async (e) => {
   const items = e.clipboardData.items;
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     if (item.type.startsWith('image/')) {
       e.preventDefault();
-      const file = item.getAsFile();
-      if (!file) return;
+      const blob = item.getAsFile();
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64 = event.target.result;
+        const privateUser = document.getElementById('private-user').value.trim();
+        let payload = { author: userName, imageUrl: base64 };
 
-      const formData = new FormData();
-      formData.append('image', file);
+        if (currentMode === 'private' && privateUser) {
+          payload.roomId = getRoomId(privateUser);
+        } else {
+          payload.spaceId = SPACE_ID;
+        }
 
-      try {
-        const res = await fetch(`${window.location.origin}/api/upload`, {
-          method: 'POST',
-          body: formData
-        });
-        const data = await res.json();
-        if (data.url) {
-          const privateUser = document.getElementById('private-user')?.value.trim() || '';
-          let payload = { author: userName, imageUrl: data.url };
-          if (currentMode === 'private' && privateUser) {
-            payload.roomId = getRoomId(privateUser);
-          } else {
-            payload.spaceId = SPACE_ID;
-          }
-
+        try {
           await fetch(`${window.location.origin}/api/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -175,11 +155,12 @@ document.getElementById('msg-input')?.addEventListener('paste', async (e) => {
           });
 
           loadMessages();
+        } catch (err) {
+          console.error('Ошибка вставки:', err);
+          alert('Не удалось вставить изображение');
         }
-      } catch (err) {
-        console.error('Ошибка вставки:', err);
-        alert('Не удалось вставить изображение');
-      }
+      };
+      reader.readAsDataURL(blob);
     }
   }
 });
@@ -211,14 +192,10 @@ function createMessageElement(msg) {
     img.src = msg.imageUrl;
     img.alt = 'Изображение';
     img.onclick = () => {
-      const url = msg.imageUrl;
-      const filename = url.split('/').pop() || 'chat-image.png';
       const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
+      a.href = msg.imageUrl;
+      a.download = `chat-image-${Date.now()}.png`;
       a.click();
-      document.body.removeChild(a);
     };
     content.appendChild(img);
   }
@@ -236,10 +213,8 @@ function getRoomId(otherName) {
 async function loadMessages() {
   if (!userName) return;
 
-  const privateUser = document.getElementById('private-user')?.value.trim() || '';
+  const privateUser = document.getElementById('private-user').value.trim();
   const container = document.getElementById('messages');
-  if (!container) return;
-
   container.innerHTML = '<div>Загрузка...</div>';
 
   try {
@@ -257,9 +232,7 @@ async function loadMessages() {
       title = `Общий чат (${SPACE_ID})`;
     }
 
-    const titleEl = document.getElementById('chat-title');
-    if (titleEl) titleEl.textContent = title;
-
+    document.getElementById('chat-title').textContent = title;
     container.innerHTML = '';
     msgs.forEach(m => {
       container.appendChild(createMessageElement(m));
@@ -267,22 +240,19 @@ async function loadMessages() {
     container.scrollTop = container.scrollHeight;
   } catch (err) {
     console.error(err);
-    if (container) {
-      container.innerHTML = '<div style="color:red;">Ошибка загрузки</div>';
-    }
+    container.innerHTML = '<div style="color:red;">Ошибка загрузки</div>';
   }
 }
 
 // === Отправка текста ===
 async function sendMessage() {
   if (!userName) return alert('Сначала введите имя');
-  const input = document.getElementById('msg-input');
-  if (!input) return;
 
+  const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text) return;
 
-  const privateUser = document.getElementById('private-user')?.value.trim() || '';
+  const privateUser = document.getElementById('private-user').value.trim();
   let payload = { text, author: userName };
 
   if (currentMode === 'private' && privateUser) {
@@ -330,11 +300,10 @@ function inviteUser() {
 }
 
 // === Enter → отправка ===
-document.getElementById('msg-input')?.addEventListener('keypress', (e) => {
+document.getElementById('msg-input').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
 });
 
 // === Автообновление ===
-if (userName) {
-  setInterval(loadMessages, 5000);
-}
+loadMessages();
+setInterval(loadMessages, 5000);
