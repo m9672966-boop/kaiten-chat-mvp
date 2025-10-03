@@ -8,7 +8,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 const UPLOADS_DIR = 'uploads';
-const upload = multer({ dest: UPLOADS_DIR });
+
+// === Сохраняем файлы с расширением ===
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, UPLOADS_DIR);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
+    if (!allowed.includes(ext)) {
+      return cb(new Error('Только изображения: png, jpg, gif, webp'), null);
+    }
+    const name = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}${ext}`;
+    cb(null, name);
+  }
+});
+const upload = multer({ storage });
 
 app.use(cors());
 app.use(express.json());
