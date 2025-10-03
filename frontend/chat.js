@@ -1,24 +1,33 @@
 const urlParams = new URLSearchParams(window.location.search);
-const SPACE_ID = urlParams.get('space') || '572075';
-const inviteName = urlParams.get('invite');
-
+let SPACE_ID = urlParams.get('space') || '572075';
 let userName = localStorage.getItem('kaiten_chat_user_name');
-if (inviteName) {
-  userName = decodeURIComponent(inviteName);
-  localStorage.setItem('kaiten_chat_user_name', userName);
-}
+let currentMode = 'space';
+
+// === Ввод имени через поле ===
 if (!userName) {
-  userName = prompt('Ваше имя и фамилия:');
-  if (userName) {
-    localStorage.setItem('kaiten_chat_user_name', userName);
+  const container = document.getElementById('messages').parentNode;
+  const nameInput = document.createElement('div');
+  nameInput.innerHTML = `
+    <div style="padding: 10px; background: #fff; border: 1px solid #ddd; margin-bottom: 10px;">
+      <input type="text" id="user-name-input" placeholder="Введите ваше имя и фамилию" style="width: 80%; padding: 8px; margin-right: 5px;">
+      <button onclick="setUserName()" style="padding: 8px 12px; background: #3498db; color: white; border: none;">✅</button>
+    </div>
+  `;
+  container.insertBefore(nameInput, document.getElementById('messages'));
+}
+
+function setUserName() {
+  const input = document.getElementById('user-name-input');
+  const name = input.value.trim();
+  if (name) {
+    userName = name;
+    localStorage.setItem('kaiten_chat_user_name', name);
+    input.parentNode.remove();
+    loadMessages();
   } else {
-    alert('Требуется имя');
-    throw new Error('No name');
+    alert('Имя обязательно');
   }
 }
-
-const API_BASE = window.location.origin;
-let currentMode = 'space';
 
 // === Переключение режима ===
 document.querySelectorAll('input[name="mode"]').forEach(radio => {
@@ -29,11 +38,10 @@ document.querySelectorAll('input[name="mode"]').forEach(radio => {
   });
 });
 
-// === Аватарка по имени ===
+// === Аватарка ===
 function getInitials(name) {
   return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
 }
-
 function getColor(name) {
   const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#d35400'];
   let hash = 0;
@@ -67,13 +75,8 @@ dropArea.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', uploadImage);
 
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-  dropArea.addEventListener(eventName, preventDefaults, false);
+  dropArea.addEventListener(eventName, e => { e.preventDefault(); e.stopPropagation(); }, false);
 });
-
-function preventDefaults(e) {
-  e.preventDefault();
-  e.stopPropagation();
-}
 
 ['dragenter', 'dragover'].forEach(eventName => {
   dropArea.addEventListener(eventName, () => dropArea.style.borderColor = '#3498db', false);
@@ -86,8 +89,8 @@ function preventDefaults(e) {
 dropArea.addEventListener('drop', handleDrop, false);
 
 function handleDrop(e) {
-  const dt = e.dataTransfer;
-  const files = dt.files;
+  e.preventDefault();
+  const files = e.dataTransfer.files;
   if (files.length) {
     fileInput.files = files;
     uploadImage();
@@ -102,7 +105,7 @@ async function uploadImage() {
   formData.append('image', file);
 
   try {
-    const res = await fetch(`${API_BASE}/api/upload`, {
+    const res = await fetch(`${window.location.origin}/api/upload`, {
       method: 'POST',
       body: formData
     });
@@ -110,14 +113,13 @@ async function uploadImage() {
     if (data.url) {
       const privateUser = document.getElementById('private-user').value.trim();
       let payload = { author: userName, imageUrl: data.url };
-
       if (currentMode === 'private' && privateUser) {
         payload.roomId = getRoomId(privateUser);
       } else {
         payload.spaceId = SPACE_ID;
       }
 
-      await fetch(`${API_BASE}/api/messages`, {
+      await fetch(`${window.location.origin}/api/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -147,7 +149,7 @@ document.getElementById('msg-input').addEventListener('paste', async (e) => {
       formData.append('image', file);
 
       try {
-        const res = await fetch(`${API_BASE}/api/upload`, {
+        const res = await fetch(`${window.location.origin}/api/upload`, {
           method: 'POST',
           body: formData
         });
@@ -155,14 +157,13 @@ document.getElementById('msg-input').addEventListener('paste', async (e) => {
         if (data.url) {
           const privateUser = document.getElementById('private-user').value.trim();
           let payload = { author: userName, imageUrl: data.url };
-
           if (currentMode === 'private' && privateUser) {
             payload.roomId = getRoomId(privateUser);
           } else {
             payload.spaceId = SPACE_ID;
           }
 
-          await fetch(`${API_BASE}/api/messages`, {
+          await fetch(`${window.location.origin}/api/messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -178,7 +179,7 @@ document.getElementById('msg-input').addEventListener('paste', async (e) => {
   }
 });
 
-// === Отображение сообщения с аватаркой ===
+// === Отображение сообщения ===
 function createMessageElement(msg) {
   const el = document.createElement('div');
   el.className = 'msg' + (msg.isCommand ? ' cmd' : '');
@@ -190,11 +191,9 @@ function createMessageElement(msg) {
 
   const content = document.createElement('div');
   content.className = 'msg-content';
-
   const authorEl = document.createElement('div');
   authorEl.className = 'msg-author';
   authorEl.textContent = msg.author;
-
   const textEl = document.createElement('div');
   textEl.className = 'msg-text';
   textEl.textContent = msg.text || '';
@@ -226,6 +225,8 @@ function getRoomId(otherName) {
 
 // === Загрузка сообщений ===
 async function loadMessages() {
+  if (!userName) return;
+
   const privateUser = document.getElementById('private-user').value.trim();
   const container = document.getElementById('messages');
   container.innerHTML = '<div>Загрузка...</div>';
@@ -236,11 +237,11 @@ async function loadMessages() {
 
     if (currentMode === 'private' && privateUser) {
       const roomId = getRoomId(privateUser);
-      const res = await fetch(`${API_BASE}/api/messages/room/${roomId}`);
+      const res = await fetch(`${window.location.origin}/api/messages/room/${roomId}`);
       msgs = await res.json();
       title = `Приватный чат с ${privateUser}`;
     } else {
-      const res = await fetch(`${API_BASE}/api/messages/space/${SPACE_ID}`);
+      const res = await fetch(`${window.location.origin}/api/messages/space/${SPACE_ID}`);
       msgs = await res.json();
       title = `Общий чат (${SPACE_ID})`;
     }
@@ -259,6 +260,8 @@ async function loadMessages() {
 
 // === Отправка текста ===
 async function sendMessage() {
+  if (!userName) return alert('Сначала введите имя');
+
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
   if (!text) return;
@@ -273,7 +276,7 @@ async function sendMessage() {
   }
 
   try {
-    await fetch(`${API_BASE}/api/messages`, {
+    await fetch(`${window.location.origin}/api/messages`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -281,7 +284,7 @@ async function sendMessage() {
 
     if (text.startsWith('/task ')) {
       const title = text.substring(6);
-      const cardRes = await fetch(`${API_BASE}/api/proxy/card`, {
+      const cardRes = await fetch(`${window.location.origin}/api/proxy/card`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ spaceId: SPACE_ID, title })
@@ -302,6 +305,7 @@ async function sendMessage() {
 
 // === Приглашение ===
 function inviteUser() {
+  if (!userName) return alert('Сначала введите имя');
   const name = prompt('Имя приглашённого:');
   if (name) {
     const link = `${window.location.origin}?space=${SPACE_ID}&invite=${encodeURIComponent(name)}`;
@@ -314,6 +318,7 @@ document.getElementById('msg-input').addEventListener('keypress', (e) => {
   if (e.key === 'Enter') sendMessage();
 });
 
-// === Запуск ===
-loadMessages();
-setInterval(loadMessages, 5000);
+// === Автообновление ===
+if (userName) {
+  setInterval(loadMessages, 5000);
+}
