@@ -49,16 +49,21 @@ function getColor(name) {
   return colors[Math.abs(hash) % colors.length];
 }
 
-// === Emoji — делегирование ===
-document.addEventListener('click', (e) => {
-  if (e.target.classList.contains('emoji')) {
-    document.getElementById('msg-input').value += e.target.textContent;
-    document.getElementById('msg-input').focus();
-    document.getElementById('emoji-picker').style.display = 'none';
-  }
+// === Emoji — прямая привязка ===
+document.getElementById('toggle-emoji').addEventListener('click', () => {
+  const picker = document.getElementById('emoji-picker');
+  picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
 });
 
-// === Загрузка изображений (в Base64) ===
+document.querySelectorAll('.emoji').forEach(el => {
+  el.addEventListener('click', () => {
+    document.getElementById('msg-input').value += el.textContent;
+    document.getElementById('msg-input').focus();
+    document.getElementById('emoji-picker').style.display = 'none';
+  });
+});
+
+// === Загрузка изображений (Base64) ===
 const dropArea = document.getElementById('drop-area');
 const fileInput = document.getElementById('file-input');
 
@@ -99,7 +104,6 @@ async function uploadImage() {
   const reader = new FileReader();
   reader.onload = async (event) => {
     const base64 = event.target.result;
-    // Отправляем Base64
     const privateUser = document.getElementById('private-user').value.trim();
     let payload = { author: userName, imageUrl: base64 };
 
@@ -211,7 +215,11 @@ function getRoomId(otherName) {
 
 // === Загрузка сообщений ===
 async function loadMessages() {
-  if (!userName) return;
+  if (!userName) {
+    const container = document.getElementById('messages');
+    container.innerHTML = '<div style="color:red;">Введите имя в поле выше</div>';
+    return;
+  }
 
   const privateUser = document.getElementById('private-user').value.trim();
   const container = document.getElementById('messages');
@@ -247,6 +255,7 @@ async function loadMessages() {
 // === Отправка текста ===
 async function sendMessage() {
   if (!userName) return alert('Сначала введите имя');
+  if (!SPACE_ID) return alert('Не указан spaceId');
 
   const input = document.getElementById('msg-input');
   const text = input.value.trim();
@@ -305,5 +314,6 @@ document.getElementById('msg-input').addEventListener('keypress', (e) => {
 });
 
 // === Автообновление ===
-loadMessages();
-setInterval(loadMessages, 5000);
+if (userName) {
+  setInterval(loadMessages, 5000);
+}
