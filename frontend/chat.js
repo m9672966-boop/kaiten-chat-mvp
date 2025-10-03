@@ -8,7 +8,7 @@ let lastMessageTime = 0;
 function playNotificationSound() {
   try {
     const audio = new Audio('/audio/oh-oh-icq-sound.mp3');
-    audio.volume = 0.15;
+    audio.volume = 0.8;
     audio.play().catch(e => console.warn('Не удалось воспроизвести звук:', e));
   } catch (e) {
     console.warn('Звук недоступен:', e);
