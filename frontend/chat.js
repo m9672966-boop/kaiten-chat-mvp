@@ -4,11 +4,11 @@ let userName = localStorage.getItem('kaiten_chat_user_name');
 let currentMode = 'space';
 let lastMessageTime = 0;
 
-// === Воспроизведение звука ===
+// === Воспроизведение MP3-звука ===
 function playNotificationSound() {
   try {
     const audio = new Audio('/audio/oh-oh-icq-sound.mp3');
-    audio.volume = 0.8;
+    audio.volume = 0.15;
     audio.play().catch(e => console.warn('Не удалось воспроизвести звук:', e));
   } catch (e) {
     console.warn('Звук недоступен:', e);
@@ -21,9 +21,8 @@ function showNotification(author, text) {
 
   if (Notification.permission === 'granted') {
     const notification = new Notification(`Новое сообщение от ${author}`, {
-      body: text.length > 50 ? text.substring(0, 50) + '...' : text,
-      icon: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233498db"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="%233498db" stroke-width="2" fill="none"/></svg>',
-      badge: 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233498db"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="%233498db" stroke-width="2" fill="none"/></svg>'
+      body: text?.length > 50 ? text.substring(0, 50) + '...' : text || '📸 Изображение',
+      icon: 'image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233498db"><circle cx="12" cy="8" r="4"/><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="%233498db" stroke-width="2" fill="none"/></svg>'
     });
 
     notification.onclick = () => {
@@ -36,12 +35,8 @@ function showNotification(author, text) {
 // === Запрос разрешения на уведомления ===
 async function requestNotificationPermission() {
   if (!('Notification' in window)) return;
-
   if (Notification.permission === 'default') {
-    const result = await Notification.requestPermission();
-    if (result === 'granted') {
-      console.log('Уведомления разрешены');
-    }
+    await Notification.requestPermission();
   }
 }
 
@@ -66,7 +61,7 @@ function setUserName() {
     localStorage.setItem('kaiten_chat_user_name', name);
     input.parentNode.remove();
     loadMessages();
-    requestNotificationPermission(); // запрашиваем уведомления
+    requestNotificationPermission();
   } else {
     alert('Имя обязательно');
   }
@@ -95,9 +90,7 @@ function getColor(name) {
 // === Emoji ===
 document.getElementById('toggle-emoji')?.addEventListener('click', () => {
   const picker = document.getElementById('emoji-picker');
-  if (picker) {
-    picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
-  }
+  if (picker) picker.style.display = picker.style.display === 'none' ? 'block' : 'none';
 });
 
 document.querySelectorAll('.emoji').forEach(el => {
@@ -113,9 +106,7 @@ const dropArea = document.getElementById('drop-area');
 const fileInput = document.getElementById('file-input');
 
 document.getElementById('toggle-upload')?.addEventListener('click', () => {
-  if (dropArea) {
-    dropArea.style.display = dropArea.style.display === 'none' ? 'block' : 'none';
-  }
+  if (dropArea) dropArea.style.display = dropArea.style.display === 'none' ? 'block' : 'none';
 });
 
 if (dropArea && fileInput) {
@@ -147,7 +138,7 @@ function handleDrop(e) {
 }
 
 async function uploadImage() {
-  if (!fileInput || !fileInput.files[0]) return;
+  if (!fileInput?.files[0]) return;
   const file = fileInput.files[0];
   const reader = new FileReader();
   reader.onload = async (event) => {
