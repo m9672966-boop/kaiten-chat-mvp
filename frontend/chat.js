@@ -5,34 +5,11 @@ let currentMode = 'space';
 let lastMessageTime = 0;
 
 // === Воспроизведение звука ===
-function playICQSound() {
+function playNotificationSound() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [
-      { freq: 659.25, duration: 0.2 }, // E5
-      { freq: 587.33, duration: 0.2 }, // D5
-      { freq: 523.25, duration: 0.2 }, // C5
-      { freq: 587.33, duration: 0.2 }, // D5
-      { freq: 659.25, duration: 0.3 }  // E5 (дольше)
-    ];
-
-    let startTime = ctx.currentTime;
-
-    notes.forEach(note => {
-      const oscillator = ctx.createOscillator();
-      const gain = ctx.createGain();
-
-      oscillator.type = 'sine';
-      oscillator.frequency.value = note.freq;
-      gain.gain.value = 0.08; // тише, чтобы не раздражало
-
-      oscillator.connect(gain);
-      gain.connect(ctx.destination);
-
-      oscillator.start(startTime);
-      oscillator.stop(startTime + note.duration);
-      startTime += note.duration + 0.02; // небольшая пауза между нотами
-    });
+    const audio = new Audio('/audio/oh-oh-icq-sound.mp3');
+    audio.volume = 0.15;
+    audio.play().catch(e => console.warn('Не удалось воспроизвести звук:', e));
   } catch (e) {
     console.warn('Звук недоступен:', e);
   }
