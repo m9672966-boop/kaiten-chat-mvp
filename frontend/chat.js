@@ -5,22 +5,34 @@ let currentMode = 'space';
 let lastMessageTime = 0;
 
 // === Воспроизведение звука ===
-function playNotificationSound() {
+function playICQSound() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const oscillator = ctx.createOscillator();
-    const gainNode = ctx.createGain();
+    const notes = [
+      { freq: 659.25, duration: 0.2 }, // E5
+      { freq: 587.33, duration: 0.2 }, // D5
+      { freq: 523.25, duration: 0.2 }, // C5
+      { freq: 587.33, duration: 0.2 }, // D5
+      { freq: 659.25, duration: 0.3 }  // E5 (дольше)
+    ];
 
-    oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    let startTime = ctx.currentTime;
 
-    oscillator.type = 'sine';
-    oscillator.frequency.value = 600; // частота (тон)
-    gainNode.gain.value = 0.1; // громкость
+    notes.forEach(note => {
+      const oscillator = ctx.createOscillator();
+      const gain = ctx.createGain();
 
-    oscillator.start();
-    gainNode.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
-    oscillator.stop(ctx.currentTime + 0.3);
+      oscillator.type = 'sine';
+      oscillator.frequency.value = note.freq;
+      gain.gain.value = 0.08; // тише, чтобы не раздражало
+
+      oscillator.connect(gain);
+      gain.connect(ctx.destination);
+
+      oscillator.start(startTime);
+      oscillator.stop(startTime + note.duration);
+      startTime += note.duration + 0.02; // небольшая пауза между нотами
+    });
   } catch (e) {
     console.warn('Звук недоступен:', e);
   }
