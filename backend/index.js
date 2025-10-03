@@ -1,34 +1,12 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
-const multer = require('multer');
-const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const UPLOADS_DIR = 'uploads';
-
-// === Сохраняем файлы с расширением ===
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOADS_DIR);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const allowed = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-    if (!allowed.includes(ext)) {
-      return cb(new Error('Только изображения: png, jpg, gif, webp'), null);
-    }
-    const name = `${Date.now()}_${Math.random().toString(36).substring(2, 10)}${ext}`;
-    cb(null, name);
-  }
-});
-const upload = multer({ storage });
-
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(UPLOADS_DIR));
 
 // === Конфигурация досок ===
 const BOARD_CONFIG = {
@@ -77,18 +55,9 @@ app.post('/api/proxy/card', async (req, res) => {
   }
 });
 
-// === Загрузка изображения ===
-app.post('/api/upload', upload.single('image'), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ error: 'Файл не загружен' });
-  }
-  const imageUrl = `${req.protocol}://${req.get('host')}/uploads/${req.file.filename}`;
-  res.json({ url: imageUrl });
-});
-
-// === Отправка сообщения ===
+// === Отправка сообщения (без изображений) ===
 app.post('/api/messages', (req, res) => {
-  const { spaceId, roomId, text, author, imageUrl } = req.body;
+  const { spaceId, roomId, text, author } = req.body;
   if (!author) return res.status(400).json({ error: 'author обязателен' });
   if (!spaceId && !roomId) return res.status(400).json({ error: 'Нужен spaceId или roomId' });
 
@@ -98,7 +67,6 @@ app.post('/api/messages', (req, res) => {
     roomId: roomId || null,
     author,
     text: text || '',
-    imageUrl: imageUrl || null,
     isCommand: text?.startsWith('/'),
     createdAt: new Date().toISOString()
   };
