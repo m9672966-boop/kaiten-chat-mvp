@@ -55,9 +55,9 @@ app.post('/api/proxy/card', async (req, res) => {
   }
 });
 
-// === Отправка сообщения (без изображений) ===
+// === Отправка сообщения (с base64 image) ===
 app.post('/api/messages', (req, res) => {
-  const { spaceId, roomId, text, author } = req.body;
+  const { spaceId, roomId, text, author, imageUrl } = req.body;
   if (!author) return res.status(400).json({ error: 'author обязателен' });
   if (!spaceId && !roomId) return res.status(400).json({ error: 'Нужен spaceId или roomId' });
 
@@ -67,6 +67,7 @@ app.post('/api/messages', (req, res) => {
     roomId: roomId || null,
     author,
     text: text || '',
+    imageUrl: imageUrl || null,
     isCommand: text?.startsWith('/'),
     createdAt: new Date().toISOString()
   };
